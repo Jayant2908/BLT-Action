@@ -1,0 +1,15 @@
+name: Bounty Test
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  test-bounty-action:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run BLT-Action for comments
+        uses: OWASP-BLT/BLT-Action@exclude_bots
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          giphy-api-key: dummy

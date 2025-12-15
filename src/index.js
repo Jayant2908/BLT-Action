@@ -185,13 +185,6 @@ const run = async () => {
                 return;
             }
 
-            const isHumanCommenter =
-                comment &&
-                comment.user &&
-                comment.user.type === 'User';
-            const login = comment && comment.user ? comment.user.login : 'unknown';
-            const type = comment && comment.user ? comment.user.type : 'unknown';
-
             if (shouldUnassign) {
                 if (!issue) {
                     console.log('Skipping /unassign: no issue context for this event.');
@@ -261,13 +254,6 @@ const run = async () => {
             }
 
             if (shouldAssign) {
-                // 🔒 Ignore assign requests from bots / GitHub Apps
-                if (!isHumanCommenter) {
-                    console.log(
-                        `Skipping /assign from non-user account: ${login} (type=${type})`
-                    );
-                    return;
-                }
 
                 console.log(`Assigning issue #${issue.number} to ${comment.user.login}`);
                 try {

@@ -36555,27 +36555,6 @@ function wrappy (fn, cb) {
 
 /***/ }),
 
-/***/ 5804:
-/***/ ((module) => {
-
-function isHumanCommenter(comment) {
-    return (
-        comment &&
-        comment.user &&
-        (comment.user.type === 'User' || comment.user.type === 'Mannequin')
-    );
-}
-
-function extractUserInfo(comment) {
-    const login = comment?.user?.login ?? "unknown";
-    const type = comment?.user?.type ?? "unknown";
-    return { login, type };
-}
-
-module.exports = { isHumanCommenter, extractUserInfo };
-
-/***/ }),
-
 /***/ 2078:
 /***/ ((module) => {
 
@@ -43765,7 +43744,20 @@ var __webpack_exports__ = {};
 const core = __nccwpck_require__(7484);
 const github = __nccwpck_require__(3228);
 const axios = __nccwpck_require__(7269);
-const { isHumanCommenter, extractUserInfo } = __nccwpck_require__(5804);
+
+function isHumanCommenter(comment) {
+    return (
+        comment &&
+        comment.user &&
+        (comment.user.type === 'User' || comment.user.type === 'Mannequin')
+    );
+}
+
+function extractUserInfo(comment) {
+    const login = comment?.user?.login ?? "unknown";
+    const type = comment?.user?.type ?? "unknown";
+    return { login, type };
+}
 
 const STALE_PR_THRESHOLD_DAYS = 60;
 
@@ -43907,7 +43899,7 @@ async function getLinkedPRsWithDetails(octokit, owner, repoName, issueNumber) {
 
     return allPRs;
 }
-const { isHumanCommenter, extractUserInfo } = __nccwpck_require__(5804);
+
 const run = async () => {
     try {
         console.log("Starting GitHub Action...");
@@ -43950,6 +43942,17 @@ const run = async () => {
             }
 
             if (shouldUnassign) {
+                if (!issue) {
+                    console.log('Skipping /unassign: no issue context for this event.');
+                    return;
+                }
+                // 🔒 Ignore unassign requests from bots / GitHub Apps
+                if (!isHumanCommenter) {
+                    console.log(
+                        `Skipping /unassign from non-user account: ${login} (type=${type})`
+                    );
+                    return;
+                }
 
                 console.log(`Unassigning issue #${issue.number} from ${comment.user.login}`);
 
@@ -44010,6 +44013,13 @@ const run = async () => {
 
                 console.log(`Assigning issue #${issue.number} to ${comment.user.login}`);
                 try {
+                    if (!issue) {
+                        console.log('Skipping /assign: no issue context for this event.');
+                        // Skip assignment - no issue context for this event
+                        return;
+                    }
+                    
+                    console.log(`Assigning issue #${issue.number} to ${comment.user.login}`);
                     const assigneeLogin = comment.user.login;
 
                     // Step 3: Updated assignment logic with 60-day stale PR handling

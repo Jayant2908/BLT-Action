@@ -1,12 +1,21 @@
 const core = require('@actions/core');
 const github = require('@actions/github');
 const axios = require('axios');
-function isHumanCommenter(comment) {
-    return (
-        comment &&
-        comment.user &&
-        (comment.user.type === 'User' || comment.user.type === 'Mannequin')
-    );
+function isHumanCommenter(comment, sender) {
+  const login = (comment?.user?.login || sender?.login || '').toLowerCase();
+  const type  = comment?.user?.type || sender?.type || '';
+
+  const blocklist = new Set([
+    'owasp-blt[bot]',
+    'coderabbitai[bot]',
+    'github-actions[bot]',
+    'dependabot[bot]',
+  ]);
+
+  const endsWithBot = /\[bot\]$/i.test(login);
+  const isHumanType = type === 'User' || type === 'Mannequin';
+
+  return isHumanType && !endsWithBot && !blocklist.has(login);
 }
 
 function extractUserInfo(comment) {
@@ -585,7 +594,7 @@ const run = async () => {
             const shouldKudos = commentBody.startsWith(kudosKeyword);
             const shouldTip = commentBody.startsWith(tipKeyword);
 
-            if ((shouldAssign || shouldUnassign) && !isHumanCommenter(comment)) {
+            if ((shouldAssign || shouldUnassign) && !isHumanCommenter(comment, github.context.payload.sender)) {
                 const { login, type } = extractUserInfo(comment);
                 console.log(`Skipping command from non-user account: ${login} (type=${type})`);
                 return; // Block bots and GitHub Apps from triggering assignment/unassignment

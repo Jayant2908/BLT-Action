@@ -43744,12 +43744,21 @@ var __webpack_exports__ = {};
 const core = __nccwpck_require__(7484);
 const github = __nccwpck_require__(3228);
 const axios = __nccwpck_require__(7269);
-function isHumanCommenter(comment) {
-    return (
-        comment &&
-        comment.user &&
-        (comment.user.type === 'User' || comment.user.type === 'Mannequin')
-    );
+function isHumanCommenter(comment, sender) {
+  const login = (comment?.user?.login || sender?.login || '').toLowerCase();
+  const type  = comment?.user?.type || sender?.type || '';
+
+  const blocklist = new Set([
+    'owasp-blt[bot]',
+    'coderabbitai[bot]',
+    'github-actions[bot]',
+    'dependabot[bot]',
+  ]);
+
+  const endsWithBot = /\[bot\]$/i.test(login);
+  const isHumanType = type === 'User' || type === 'Mannequin';
+
+  return isHumanType && !endsWithBot && !blocklist.has(login);
 }
 
 function extractUserInfo(comment) {
@@ -43925,19 +43934,29 @@ async function ensureClosedPRLabel(octokit, owner, repoName) {
 
 function extractLinkedIssuesFromPRBody(prBody, currentOwner, currentRepo) {
     if (!prBody) return [];
-    const regex = /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)(?:\s*:\s*|\s+)(?:#(\d+)|https?:\/\/github\.com\/([^\/]+)\/([^\/]+)\/issues\/(\d+))/gi;
+    const regex = /(?<!\w)(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)(?:\s*:\s*|\s+)(?:(?:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+))?#(\d+)|https?:\/\/github\.com\/([^\/]+)\/([^\/]+)\/issues\/(\d+))/gi;
     const matches = [...prBody.matchAll(regex)];
     const issues = [];
     
     for (const match of matches) {
-        if (match[1]) {
-            issues.push(parseInt(match[1]));
-        } else if (match[2] && match[3] && match[4]) {
-            const urlOwner = match[2];
-            const urlRepo = match[3];
-            const issueNumber = parseInt(match[4]);
-            
-            if (urlOwner === currentOwner && urlRepo === currentRepo) {
+        if (match[3]) {
+            const refOwner = match[1];
+            const refRepo = match[2];
+            const issueNumber = parseInt(match[3]);
+
+            if (refOwner && refRepo) {
+                if (refOwner.toLowerCase() === currentOwner.toLowerCase() && refRepo.toLowerCase() === currentRepo.toLowerCase()) {
+                    issues.push(issueNumber);
+                }
+            } else {
+                issues.push(issueNumber);
+            }
+        } else if (match[4] && match[5] && match[6]) {
+            const urlOwner = match[4];
+            const urlRepo = match[5];
+            const issueNumber = parseInt(match[6]);
+            if (urlOwner.toLowerCase() === currentOwner.toLowerCase() &&
+                urlRepo.toLowerCase() === currentRepo.toLowerCase()) {
                 issues.push(issueNumber);
             }
         }
@@ -44318,7 +44337,7 @@ const run = async () => {
             const shouldKudos = commentBody.startsWith(kudosKeyword);
             const shouldTip = commentBody.startsWith(tipKeyword);
 
-            if ((shouldAssign || shouldUnassign) && !isHumanCommenter(comment)) {
+            if ((shouldAssign || shouldUnassign) && !isHumanCommenter(comment, github.context.payload.sender)) {
                 const { login, type } = extractUserInfo(comment);
                 console.log(`Skipping command from non-user account: ${login} (type=${type})`);
                 return; // Block bots and GitHub Apps from triggering assignment/unassignment
